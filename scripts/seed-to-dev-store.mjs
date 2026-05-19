@@ -15,7 +15,7 @@
  * Reads .env: SHOPIFY_STORE_URL=*.myshopify.com, SHOPIFY_ACCESS_TOKEN=shpat_…
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const WRITE = process.argv.includes('--write');
@@ -71,7 +71,10 @@ async function api(method, endpoint, body) {
 }
 
 async function paginate(endpoint) {
-  let next = `${API}/${endpoint}?limit=250`;
+  // `endpoint` may already contain a query string (e.g. "products.json?fields=id").
+  // Use the right separator so we don't end up with two `?` and a broken URL.
+  const sep = endpoint.includes('?') ? '&' : '?';
+  let next = `${API}/${endpoint}${sep}limit=250`;
   const out = [];
   while (next) {
     const r = await fetch(next, { headers: { 'X-Shopify-Access-Token': TOKEN } });
@@ -91,11 +94,12 @@ async function pool(items, worker, concurrency = CONCURRENCY) {
   let ok = 0, fail = 0;
   let lastLog = Date.now();
   const total = items.length;
+  const errors = [];
   await Promise.all(
     Array.from({ length: concurrency }, async () => {
       while (idx < items.length) {
         const i = idx++;
-        try { await worker(items[i], i); ok++; } catch { fail++; }
+        try { await worker(items[i], i); ok++; } catch (e) { fail++; if (errors.length < 3) errors.push(e.message); }
         if (Date.now() - lastLog > 2000) {
           console.log(`  ${ok + fail}/${total} (${ok} ok, ${fail} failed)`);
           lastLog = Date.now();
@@ -103,6 +107,7 @@ async function pool(items, worker, concurrency = CONCURRENCY) {
       }
     }),
   );
+  if (fail && errors.length) for (const e of errors) console.log(`    sample error: ${e.slice(0, 200)}`);
   return { ok, fail };
 }
 
@@ -111,7 +116,49 @@ const seedPath = path.join(process.cwd(), 'seed.json');
 if (!existsSync(seedPath)) { console.error('No seed.json in CWD'); process.exit(1); }
 const seed = JSON.parse(readFileSync(seedPath, 'utf-8'));
 
-const productsToCreate = FULL ? seed.products : seed.products.slice(0, SLIM_PRODUCTS);
+// Slim seed: keep the FIRST 40 products BUT make sure the ones referenced by name in
+// templates/index.json (Featured Products, "Build Your Own Knife Set", etc.) are included.
+// Otherwise those sections render empty on the homepage.
+function collectReferencedProductHandles() {
+  const handles = new Set();
+  for (const dir of ['templates', 'sections', 'config', 'blocks']) {
+    const full = path.join(process.cwd(), dir);
+    if (!existsSync(full)) continue;
+    const walk = (d) => {
+      const out = [];
+      for (const n of readdirSync(d)) {
+        const f = path.join(d, n);
+        if (statSync(f).isDirectory()) out.push(...walk(f));
+        else if (f.endsWith('.json')) out.push(f);
+      }
+      return out;
+    };
+    for (const file of walk(full)) {
+      const txt = readFileSync(file, 'utf-8');
+      // Match "product-handle-string" entries inside "products": [...] arrays
+      // and direct shopify://products/X refs.
+      for (const m of txt.matchAll(/shopify:\/\/products\/([\w-]+)/g)) handles.add(m[1]);
+      // Heuristic: match "products": ["a", "b"] lists used by featured/related sections
+      for (const m of txt.matchAll(/"products"\s*:\s*\[([^\]]+)\]/g)) {
+        for (const h of m[1].matchAll(/"([\w-]+)"/g)) handles.add(h[1]);
+      }
+    }
+  }
+  return handles;
+}
+
+let productsToCreate;
+if (FULL) {
+  productsToCreate = seed.products;
+} else {
+  const referenced = collectReferencedProductHandles();
+  const byHandle = new Map(seed.products.map((p) => [p.handle, p]));
+  // Always include products referenced by the theme, then fill remaining slots
+  const priority = [...referenced].map((h) => byHandle.get(h)).filter(Boolean);
+  const remaining = seed.products.filter((p) => !referenced.has(p.handle));
+  productsToCreate = [...priority, ...remaining.slice(0, Math.max(0, SLIM_PRODUCTS - priority.length))];
+  console.log(`Slim seed: ${priority.length} theme-referenced + ${productsToCreate.length - priority.length} backfill = ${productsToCreate.length} products`);
+}
 const articlesToCreate = FULL ? seed.articles : seed.articles.slice(0, SLIM_ARTICLES);
 
 console.log(`\n${WRITE ? '✓ WRITE' : 'DRY-RUN'} → ${hostname}`);

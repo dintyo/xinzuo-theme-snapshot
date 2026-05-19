@@ -11,27 +11,43 @@
  * Requires .env with SHOPIFY_STORE_URL + SHOPIFY_ACCESS_TOKEN.
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 const startedAt = Date.now();
 const scriptDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'));
 const args = process.argv.slice(2);
 
-function step(name, script, extraArgs = []) {
-  console.log(`\n━━━ ${name} ━━━`);
-  const stepStart = Date.now();
-  const r = spawnSync('node', [path.join(scriptDir, script), ...args, ...extraArgs], { stdio: 'inherit' });
-  const stepElapsed = Math.round((Date.now() - stepStart) / 1000);
-  if (r.status !== 0) {
-    console.error(`\n✗ ${name} failed after ${stepElapsed}s. Aborting.`);
-    process.exit(r.status ?? 1);
-  }
-  console.log(`✓ ${name} took ${stepElapsed}s`);
+// Each child prefixes its lines so the interleaved output stays legible.
+function runStep(label, script, extraArgs = []) {
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const child = spawn('node', [path.join(scriptDir, script), ...args, ...extraArgs], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const tag = `[${label}]`;
+    const onLine = (stream) => (chunk) => {
+      const lines = chunk.toString('utf-8').split(/\r?\n/);
+      for (const l of lines) if (l.trim()) stream.write(`${tag} ${l}\n`);
+    };
+    child.stdout.on('data', onLine(process.stdout));
+    child.stderr.on('data', onLine(process.stderr));
+    child.on('exit', (code) => {
+      const s = Math.round((Date.now() - startedAt) / 1000);
+      if (code !== 0) reject(new Error(`${label} failed after ${s}s (exit ${code})`));
+      else { console.log(`✓ ${label} took ${s}s`); resolve(); }
+    });
+  });
 }
 
-step('1/2 Seed dev store', 'seed-to-dev-store.mjs');
-step('2/2 Push theme', 'push-theme.mjs');
+// Run sequentially: seed (incl. media) first, then theme push. Parallel runs cause
+// the wipe step's DELETE requests to be heavily rate-limited by the simultaneous theme
+// asset uploads, leading to thousands of failed wipes.
+try {
+  await runStep('seed', 'seed-to-dev-store.mjs');
+  await runStep('theme', 'push-theme.mjs');
+} catch (e) {
+  console.error(`\n✗ ${e.message}. Aborting.`);
+  process.exit(1);
+}
 
 const total = Math.round((Date.now() - startedAt) / 1000);
 console.log(`\n━━━ TOTAL: ${total}s (${(total / 60).toFixed(1)} min) ━━━`);

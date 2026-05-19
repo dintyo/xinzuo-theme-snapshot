@@ -265,6 +265,12 @@
       "size": 752
     },
     {
+      "origRef": "shopify://shop_images/ArrowUpRight.svg",
+      "newRef": "shopify://shop_images/ArrowUpRight.svg",
+      "filename": "ArrowUpRight.svg",
+      "size": 532
+    },
+    {
       "origRef": "shopify://shop_images/b1fa6330324f62e39fb552db8ffd60a3_47b2bdf2-b83b-4cde-a5af-f3c4925cf85e.webp",
       "newRef": "shopify://shop_images/b1fa6330324f62e39fb552db8ffd60a3_47b2bdf2-b83b-4cde-a5af-f3c4925cf85e.webp",
       "filename": "b1fa6330324f62e39fb552db8ffd60a3_47b2bdf2-b83b-4cde-a5af-f3c4925cf85e.webp",
@@ -353,6 +359,12 @@
       "newRef": "shopify://shop_images/Frame_464.webp",
       "filename": "Frame_464.webp",
       "size": 2970
+    },
+    {
+      "origRef": "shopify://shop_images/Frame_666.png",
+      "newRef": "shopify://shop_images/Frame_666.png",
+      "filename": "Frame_666.png",
+      "size": 5146
     },
     {
       "origRef": "shopify://shop_images/GooglePay.png",
@@ -769,10 +781,22 @@
       "size": 2332
     },
     {
+      "origRef": "shopify://shop_images/MagnifyingGlass.svg",
+      "newRef": "shopify://shop_images/MagnifyingGlass.svg",
+      "filename": "MagnifyingGlass.svg",
+      "size": 674
+    },
+    {
       "origRef": "shopify://shop_images/Mastercard.png",
       "newRef": "shopify://shop_images/Mastercard.webp",
       "filename": "Mastercard.webp",
       "size": 754
+    },
+    {
+      "origRef": "shopify://shop_images/menu-list.svg",
+      "newRef": "shopify://shop_images/menu-list.svg",
+      "filename": "menu-list.svg",
+      "size": 675
     },
     {
       "origRef": "shopify://shop_images/Phone_7c4cb859-c5e2-45b0-87a2-b25915dac8a2.png",
@@ -877,6 +901,12 @@
       "size": 904
     },
     {
+      "origRef": "shopify://shop_images/ShoppingCartSimple.svg",
+      "newRef": "shopify://shop_images/ShoppingCartSimple.svg",
+      "filename": "ShoppingCartSimple.svg",
+      "size": 1089
+    },
+    {
       "origRef": "shopify://shop_images/Square_1.png",
       "newRef": "shopify://shop_images/Square_1.webp",
       "filename": "Square_1.webp",
@@ -943,5 +973,5 @@
       "size": 750
     }
   ],
-  "generatedAt": "2026-05-19T13:19:48.136Z"
+  "generatedAt": "2026-05-19T14:55:40.353Z"
 }
